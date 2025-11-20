@@ -1,179 +1,296 @@
 <template>
-  <div class="question-container">
-    <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-2">AIソクラテスからの質問</h2>
+  <div class="flex flex-col h-[85vh] max-w-3xl mx-auto bg-white rounded-xl shadow-2xl overflow-hidden">
 
-    <!-- データを取得中の場合 -->
-    <div v-if="isLoading" class="flex items-center space-x-2 text-blue-500">
-      <svg class="animate-spin h-5 w-5 mr-3 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none"
-        viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor"
-          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-        </path>
-      </svg>
-      <p>データをロード中...</p>
-    </div>
+    <!-- 1. 会話表示エリア (Chat History) -->
+    <div ref="chatWindow" class="flex-grow p-6 space-y-6 overflow-y-auto custom-scrollbar">
 
-    <!-- エラーが発生した場合 -->
-    <p v-else-if="error" class="text-red-600 font-semibold p-4 border border-red-300 rounded-lg bg-red-50">
-      エラーが発生しました。バックエンドサーバーが起動しているか確認してください。<br>
-      詳細: {{ error.message }}
-    </p>
-
-    <!-- データが正常に取得できた場合 -->
-    <div v-else-if="questionData">
-      <p class="text-sm text-gray-500 mb-2 italic">トピック: コンピュータ基礎</p>
-
-      <!-- 結果表示エリア -->
-      <div v-if="isAnswered && !answerResult.isChecking && !answerResult.error"
-        :class="answerResult.isCorrect ? 'bg-green-100 border-green-400' : 'bg-red-100 border-red-400'"
-        class="p-4 mb-4 border-l-4 rounded-lg shadow-md font-semibold">
-
-        <p :class="answerResult.isCorrect ? 'text-green-800' : 'text-red-800'">
-          {{ answerResult.isCorrect ? '✨ 素晴らしい、正解です！' : '🤔 惜しいです。' }}
-        </p>
-
-        <!-- バックエンドから返されるAIの解説・壁打ちメッセージ -->
-        <p v-if="answerResult.explanation" class="text-sm mt-2 text-gray-700">{{ answerResult.explanation }}</p>
-
-        <!-- 次の問題ボタン -->
-        <button v-if="isAnswered && !answerResult.isChecking" @click="fetchQuestion"
-          class="mt-4 w-full py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition duration-200">
-          次の問題へ進む
-        </button>
+      <!-- ロード中メッセージ -->
+      <div v-if="isLoading" class="text-center text-gray-500 py-10">
+        <svg class="animate-spin h-6 w-6 text-indigo-500 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none"
+          viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+          </path>
+        </svg>
+        <p>AIソクラテスが知識を整理しています...</p>
       </div>
 
-      <!-- 問題文 -->
-      <h3 class="text-2xl font-semibold mb-4 text-gray-700 p-4 bg-indigo-100 rounded-lg shadow-inner">
-        {{ questionData.question_text }}
-      </h3>
+      <!-- 会話メッセージのループ -->
+      <div v-for="(message, index) in history" :key="index" class="flex"
+        :class="message.sender === 'user' ? 'justify-end' : 'justify-start'">
 
-      <!-- ★★★ 修正箇所: 選択肢をヒントとして復活させる ★★★ -->
-      <h5 class="text-base font-semibold mt-4 mb-2 text-gray-600 border-b border-dashed pb-1">ヒント (選択肢)</h5>
-      <ul class="list-disc list-inside text-sm text-gray-500 mb-4 ml-4 space-y-1">
-        <li v-for="choice in questionData.choices" :key="choice.id">
-          {{ choice.choice_text }}
-        </li>
-      </ul>
-      <!-- ★★★ 修正箇所 ここまで ★★★ -->
+        <div
+          :class="message.sender === 'user' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-gray-100 text-gray-800 rounded-tl-none'"
+          class="max-w-[80%] px-4 py-3 rounded-xl shadow-md whitespace-pre-wrap">
 
-      <h4 class="text-lg font-medium mt-6 mb-3 border-l-4 border-indigo-500 pl-2">あなたの考え（回答）を教えてください:</h4>
+          <!-- AI (質問/応答) -->
+          <div v-if="message.sender === 'ai'">
+            <span class="font-bold text-indigo-600 mr-2" v-if="message.type === 'question'">💡 質問:</span>
+            <span class="font-bold text-gray-700 mr-2" v-else>🧠 AI:</span>
+            <p class="mt-1" v-html="message.text"></p>
 
-      <!-- ★★★ テキスト入力フォーム ★★★ -->
-      <textarea v-model="userAnswerText" :disabled="isAnswered"
-        class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 resize-none h-24"
-        placeholder="例: CPUはコンピュータの頭脳なので、それにあたります。"></textarea>
+            <!-- ヒントと選択肢（初回質問時のみ表示） -->
+            <div v-if="message.choices && message.choices.length > 0 && message.type === 'question'"
+              class="mt-3 text-xs p-2 bg-gray-200 rounded-lg border border-gray-300">
+              <p class="font-semibold text-gray-700 mb-1">ヒント（選択肢）:</p>
+              <ul class="list-disc list-inside ml-4">
+                <li v-for="choice in message.choices" :key="choice.id">
+                  {{ choice.choice_text }}
+                </li>
+              </ul>
+            </div>
 
-      <button @click="checkAnswer()" :disabled="isAnswered || !userAnswerText.trim()"
-        :class="{ 'opacity-50 cursor-not-allowed': isAnswered || !userAnswerText.trim() }"
-        class="mt-3 w-full py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition duration-200">
-        {{ isAnswered ? '回答済み' : '回答を送信' }}
+            <!-- AI応答の正誤ステータス表示 -->
+            <div v-if="message.is_correct !== undefined && message.type !== 'question'"
+              class="mt-2 pt-2 border-t border-gray-300">
+              <span class="text-xs font-semibold" :class="message.is_correct ? 'text-green-600' : 'text-orange-500'">
+                {{ message.is_correct ? '✅ 正誤判定: 正解' : '⚠️ 正誤判定: 要検討' }}
+              </span>
+            </div>
+          </div>
+
+          <!-- ユーザー回答 -->
+          <div v-else>
+            <span class="font-bold">👤 あなた:</span>
+            <p class="mt-1">{{ message.text }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- エラー表示 (チャット形式) -->
+      <div v-if="error" class="text-red-600 p-4 bg-red-50 border border-red-300 rounded-xl">
+        エラー: {{ error.message }}
+        <button @click="fetchInitialQuestion" class="ml-4 text-sm underline">問題を再取得</button>
+      </div>
+    </div>
+
+    <!-- 2. 入力フォームエリア (Fixed Bottom) -->
+    <div class="p-4 border-t border-gray-200 bg-white sticky bottom-0">
+
+      <!-- ★修正: 通常の入力エリア (isSufficientがfalseの間だけ表示) ★ -->
+      <textarea v-if="!isSufficient" v-model="inputAnswer" @keydown.enter.prevent.exact="handleSend"
+        :disabled="isSending || !currentQuestionId"
+        class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 resize-none h-16"
+        placeholder="あなたの考えを詳しく入力 (Enterで送信, Shift+Enterで改行)"></textarea>
+
+      <!-- ★修正: 送信ボタン (isSufficientがfalseの間だけ表示) ★ -->
+      <button v-if="!isSufficient" @click="handleSend" :disabled="isSending || !inputAnswer.trim() || !currentQuestionId" :class="{
+        'opacity-50 cursor-not-allowed bg-gray-400': isSending || !inputAnswer.trim() || !currentQuestionId,
+        'hover:bg-indigo-700': !isSending && inputAnswer.trim() && currentQuestionId
+      }"
+        class="mt-2 w-full py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg transition duration-200 flex items-center justify-center">
+        <svg v-if="isSending" class="animate-spin h-5 w-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none"
+          viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+          </path>
+        </svg>
+        {{ isSending ? 'AIが思考中...' : '回答を送信' }}
+      </button>
+
+      <!-- ★追加: 次の問題へ進むボタン (isSufficientがtrueの時だけ表示) ★ -->
+      <button v-else @click="fetchInitialQuestion"
+        class="mt-2 w-full py-3 bg-green-500 text-white font-semibold rounded-lg shadow-lg transition duration-200 hover:bg-green-600 flex items-center justify-center space-x-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+        <span>理解完了！次の問題へ進む</span>
       </button>
 
     </div>
-
-    <!-- データがまだない場合（初期状態） -->
-    <p v-else class="text-gray-500 p-4 bg-white rounded-lg border">APIからデータを取得する準備ができました。サーバーを確認してください。</p>
 
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 import axios from 'axios';
 
-// 状態管理変数 (既存)
-const questionData = ref(null);
+// DOM要素への参照
+const chatWindow = ref(null);
+
+// 状態管理変数
+const history = ref([]); // 会話履歴全体 (メッセージ配列)
 const isLoading = ref(true);
 const error = ref(null);
+const inputAnswer = ref('');    // ユーザーの入力テキスト
+const isSending = ref(false);   // 送信中フラグ
+const isSufficient = ref(false); // ★追加: 問答が終了したかどうかのフラグ
 
-// ステップ6で追加・更新する状態変数
-const answerResult = ref(null);   // 回答結果
-const isAnswered = ref(false);    // 回答済みフラグ
-const userAnswerText = ref('');   // ★追加: ユーザーの入力テキスト
+// 現在の問題ID (会話のどの部分に属するかを識別するために必要)
+const currentQuestionId = ref(null);
+
+// トピックID (現在は固定)
+const currentTopicId = 1;
+
+/**
+ * InteractionデータをフロントエンドのMessageフォーマットに変換するヘルパー関数
+ */
+const formatInteractions = (interactions) => {
+  const formattedHistory = [];
+
+  interactions.forEach(interaction => {
+    // ユーザーの回答をプッシュ
+    formattedHistory.push({
+      sender: 'user',
+      type: 'answer',
+      text: interaction.user_answer,
+      question_id: interaction.question_id,
+    });
+
+    // AIの応答をプッシュ
+    formattedHistory.push({
+      sender: 'ai',
+      type: 'feedback',
+      text: interaction.ai_response,
+      question_id: interaction.question_id,
+      is_correct: interaction.is_correct,
+    });
+  });
+  return formattedHistory;
+};
 
 
 /**
- * バックエンドAPIを呼び出し、問題データを取得する関数 (リセット処理を追加)
+ * チャットウィンドウを最下部までスクロールする
  */
-const fetchQuestion = async () => {
-  isLoading.value = true;
-  error.value = null;
-  // ★★★ ステップ6で追加: リセット処理 ★★★
-  isAnswered.value = false;
-  answerResult.value = null;
-  userAnswerText.value = ''; // テキスト入力をリセット
-  // ★★★★★★★★★★★★★★★★★★★★★★★★★★
+const scrollToBottom = () => {
+  nextTick(() => {
+    const el = chatWindow.value;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  });
+};
+
+/**
+ * 過去の会話履歴をデータベースから取得する関数
+ */
+const fetchHistory = async (questionId) => {
+  // ★修正: currentQuestionIdではなく、引数で渡されたIDを使う
+  const tempQuestionId = questionId || 1;
 
   try {
-    const API_URL = 'http://localhost/api/topics/1/next-question';
+    const API_URL = `http://localhost/api/questions/${tempQuestionId}/history`;
     const response = await axios.get(API_URL);
-    questionData.value = response.data;
-
+    return formatInteractions(response.data.history);
   } catch (err) {
-    console.error("API呼び出しエラー:", err);
-    if (err.response) {
-      error.value = { message: `サーバーエラー (${err.response.status}): ${err.response.data.message || 'データ取得に失敗しました'}` };
-    } else if (err.request) {
-      error.value = { message: 'サーバーからの応答がありません。バックエンドが実行されているか確認してください。' };
-    } else {
-      error.value = { message: err.message };
-    }
-  } finally {
-    isLoading.value = false;
+    console.error("履歴取得エラー:", err);
+    return [];
   }
 };
 
 
 /**
- * ユーザーの回答(テキスト)をバックエンドに送信し、正誤判定を行う関数
+ * 最初の質問、または次の質問を取得し、会話履歴をリセットする
  */
-const checkAnswer = async () => {
-  // 回答済み、入力が空、データがない場合は実行しない
-  if (isAnswered.value || !userAnswerText.value.trim() || !questionData.value) return;
+const fetchInitialQuestion = async () => {
+  isLoading.value = true;
+  error.value = null;
+  isSending.value = false;
 
-  isAnswered.value = true;
-  answerResult.value = { isChecking: true };
+  // ★修正: 新しい問題に移るので、履歴と終了フラグをリセット
+  history.value = [];
+  isSufficient.value = false;
+
+  // 1. 次の質問を取得 (GET /api/topics/{topicId}/next-question)
+  try {
+    const API_URL = `http://localhost/api/topics/${currentTopicId}/next-question`;
+    const response = await axios.get(API_URL);
+    const data = response.data;
+
+    currentQuestionId.value = data.id; // 現在の問題IDを更新
+
+    // 2. 質問メッセージを作成して履歴に追加
+    const questionMessage = {
+      sender: 'ai',
+      type: 'question',
+      text: data.question_text,
+      question_id: data.id,
+      choices: data.choices // ヒントとして表示するために選択肢も保持
+    };
+    history.value.push(questionMessage);
+
+    // 3. 過去の対話履歴をDBから取得し、会話に追記 (重要)
+    // ★修正: 取得した新しい問題IDを使って履歴を取得する
+    const pastInteractions = await fetchHistory(data.id);
+    history.value.push(...pastInteractions);
+
+
+  } catch (err) {
+    console.error("問題取得エラー:", err);
+    error.value = { message: err.response?.data?.message || '問題データの取得に失敗しました。' };
+  }
+
+  isLoading.value = false;
+  scrollToBottom();
+};
+
+
+/**
+ * ユーザーが回答を送信した際の処理 (初回回答、または継続的な対話の回答)
+ */
+const handleSend = async () => {
+  if (isSending.value || !inputAnswer.value.trim() || !currentQuestionId.value) return;
+
+  const answer = inputAnswer.value;
+  inputAnswer.value = ''; // 入力エリアをクリア
+  isSending.value = true;
+
+  // 1. ユーザーの回答を履歴に追加
+  history.value.push({
+    sender: 'user',
+    type: 'answer',
+    text: answer,
+    question_id: currentQuestionId.value
+  });
+  scrollToBottom();
 
   try {
-    const questionId = questionData.value.id;
-    const API_URL = `http://localhost/api/questions/${questionId}/check`;
+    // 2. バックエンドAPIを呼び出し (POST /api/questions/{questionId}/check)
+    const API_URL = `http://localhost/api/questions/${currentQuestionId.value}/check`;
 
-    // answer_text を送信
     const response = await axios.post(API_URL, {
-      answer_text: userAnswerText.value
+      answer_text: answer
     });
 
-    // 成功した場合、正誤判定結果を格納
-    answerResult.value = {
-      isChecking: false,
-      isCorrect: response.data.is_correct,
-      explanation: response.data.explanation,
-      user_answer: response.data.user_answer
-    };
+    const data = response.data;
+
+    // 3. AIの応答を履歴に追加
+    history.value.push({
+      sender: 'ai',
+      type: 'feedback',
+      text: data.explanation,
+      question_id: currentQuestionId.value,
+      is_correct: data.is_correct, // 正誤判定結果も表示に利用
+    });
+
+    // ★追加: バックエンドからの終了合図をチェックし、フラグを立てる
+    if (data.is_sufficient === true) {
+      isSufficient.value = true;
+    }
 
   } catch (err) {
     console.error("回答送信エラー:", err);
-    isAnswered.value = false;
-    answerResult.value = {
-      isChecking: false,
-      error: "回答の送信に失敗しました。"
-    };
+    error.value = { message: err.response?.data?.message || 'AI通信中にエラーが発生しました。' };
+  } finally {
+    isSending.value = false;
+    scrollToBottom();
   }
 };
 
-onMounted(fetchQuestion);
+onMounted(fetchInitialQuestion);
 </script>
 
 <style scoped>
-/* Tailwind CSSを使用することを想定したスタイル */
-.question-container {
-  padding: 24px;
-  background-color: #ffffff;
-  border-radius: 12px;
-  max-width: 700px;
-  width: 90%;
-  margin: 40px auto;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+/* スクロールバーのスタイルはブラウザによって異なるため、簡易的に定義 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #ccc;
+  border-radius: 3px;
 }
 </style>
+
