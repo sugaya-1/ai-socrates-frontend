@@ -1,296 +1,322 @@
 <template>
-  <div class="flex flex-col h-[85vh] max-w-3xl mx-auto bg-white rounded-xl shadow-2xl overflow-hidden">
+  <div class="flex items-center justify-center min-h-screen bg-gray-100 text-gray-800 font-sans">
 
-    <!-- 1. 会話表示エリア (Chat History) -->
-    <div ref="chatWindow" class="flex-grow p-6 space-y-6 overflow-y-auto custom-scrollbar">
+    <!-- メインのチャットウィンドウ -->
+    <div
+      class="w-full max-w-2xl h-[90vh] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden relative border border-gray-200">
 
-      <!-- ロード中メッセージ -->
-      <div v-if="isLoading" class="text-center text-gray-500 py-10">
-        <svg class="animate-spin h-6 w-6 text-indigo-500 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none"
-          viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-          </path>
-        </svg>
-        <p>AIソクラテスが知識を整理しています...</p>
-      </div>
+      <!-- ヘッダー -->
+      <header class="py-4 px-6 border-b border-gray-100 bg-white z-10 shrink-0 text-center">
+        <h1 class="text-xl font-bold text-gray-800 tracking-tight">AIソクラテス</h1>
+        <p class="text-xs text-gray-500 mt-1 font-medium">汝自身を知れ</p>
+      </header>
 
-      <!-- 会話メッセージのループ -->
-      <div v-for="(message, index) in history" :key="index" class="flex"
-        :class="message.sender === 'user' ? 'justify-end' : 'justify-start'">
+      <!-- チャットメッセージ表示エリア -->
+      <main ref="chatWindow" class="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar relative bg-white">
 
-        <div
-          :class="message.sender === 'user' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-gray-100 text-gray-800 rounded-tl-none'"
-          class="max-w-[80%] px-4 py-3 rounded-xl shadow-md whitespace-pre-wrap">
-
-          <!-- AI (質問/応答) -->
-          <div v-if="message.sender === 'ai'">
-            <span class="font-bold text-indigo-600 mr-2" v-if="message.type === 'question'">💡 質問:</span>
-            <span class="font-bold text-gray-700 mr-2" v-else>🧠 AI:</span>
-            <p class="mt-1" v-html="message.text"></p>
-
-            <!-- ヒントと選択肢（初回質問時のみ表示） -->
-            <div v-if="message.choices && message.choices.length > 0 && message.type === 'question'"
-              class="mt-3 text-xs p-2 bg-gray-200 rounded-lg border border-gray-300">
-              <p class="font-semibold text-gray-700 mb-1">ヒント（選択肢）:</p>
-              <ul class="list-disc list-inside ml-4">
-                <li v-for="choice in message.choices" :key="choice.id">
-                  {{ choice.choice_text }}
-                </li>
-              </ul>
+        <!-- 1. スタート画面 (未開始時) -->
+        <div v-if="!hasStarted" class="flex flex-col items-center justify-center h-full space-y-10 fade-in pb-20">
+          <!-- 挨拶バブル -->
+          <div
+            class="bg-slate-50 text-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 max-w-[85%] text-base leading-relaxed relative">
+            <div class="absolute -top-2 left-5 w-4 h-4 bg-slate-50 border-t border-l border-slate-100 rotate-45"></div>
+            <div class="mb-3 text-xs font-bold text-slate-500 flex items-center gap-1">
+              <span>🧠 ソクラテス</span>
             </div>
+            <p>良き探求者よ、こんにちは。<br>我と共に知への道を歩み始めようではないか。<br>準備はよろしいかな？</p>
+          </div>
 
-            <!-- AI応答の正誤ステータス表示 -->
-            <div v-if="message.is_correct !== undefined && message.type !== 'question'"
-              class="mt-2 pt-2 border-t border-gray-300">
-              <span class="text-xs font-semibold" :class="message.is_correct ? 'text-green-600' : 'text-orange-500'">
-                {{ message.is_correct ? '✅ 正誤判定: 正解' : '⚠️ 正誤判定: 要検討' }}
-              </span>
+          <!-- 始めようボタン -->
+          <button @click="startSession"
+            class="bg-blue-500 text-white text-lg font-bold py-3 px-12 rounded-full shadow-lg hover:bg-blue-600 hover:shadow-xl hover:-translate-y-0.5 transition duration-200 ease-in-out">
+            始めよう
+          </button>
+        </div>
+
+        <!-- 2. 全問クリア画面 -->
+        <div v-else-if="isCompleted"
+          class="flex flex-col items-center justify-center h-full space-y-6 fade-in text-center p-8">
+          <div class="text-6xl mb-4 animate-bounce">🎉</div>
+          <h2 class="text-2xl font-bold text-gray-800">素晴らしい！</h2>
+          <p class="text-gray-600 leading-relaxed">全問クリアしました。<br>おめでとうございます！</p>
+          <button @click="resetSession"
+            class="mt-6 text-blue-500 hover:text-blue-700 font-semibold underline decoration-2 underline-offset-4">最初からやり直す</button>
+        </div>
+
+        <!-- 3. チャット履歴 -->
+        <template v-else>
+          <div v-for="(message, index) in history" :key="index" class="flex w-full fade-in group"
+            :class="message.sender === 'user' ? 'justify-end' : 'justify-start'">
+
+            <!-- バブル本体 -->
+            <div :class="[
+              'p-4 max-w-[85%] text-[15px] leading-relaxed shadow-sm relative rounded-2xl',
+              message.sender === 'user'
+                ? 'bg-blue-500 text-white rounded-tr-sm'
+                : 'bg-slate-100 text-slate-800 rounded-tl-sm'
+            ]">
+              <!-- ラベル -->
+              <div v-if="message.sender === 'ai'"
+                class="mb-1.5 text-xs font-bold text-slate-500/80 flex items-center gap-1 select-none">
+                <span v-if="message.type === 'question'">💡 問い</span>
+                <span v-else>ソクラテス</span>
+              </div>
+
+              <!-- テキスト -->
+              <div class="whitespace-pre-wrap break-words" v-html="message.text"></div>
+
+              <!-- 選択肢 -->
+              <div v-if="message.choices && message.choices.length > 0 && message.type === 'question'"
+                class="mt-4 pt-3 border-t border-slate-200/60">
+                <p class="text-xs font-semibold text-slate-500 mb-2">選択肢:</p>
+                <div class="flex flex-col space-y-1.5">
+                  <span v-for="choice in message.choices" :key="choice.id"
+                    class="text-sm bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 shadow-sm">
+                    {{ choice.choice_text }}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- ユーザー回答 -->
-          <div v-else>
-            <span class="font-bold">👤 あなた:</span>
-            <p class="mt-1">{{ message.text }}</p>
+          <!-- AI思考中 -->
+          <div v-if="isSending || isLoading" class="flex justify-start fade-in">
+            <div
+              class="p-4 rounded-2xl rounded-tl-sm bg-slate-100 text-slate-800 shadow-sm flex items-center min-h-[40px]">
+              <div class="typing-indicator"><span></span><span></span><span></span></div>
+            </div>
+          </div>
+
+          <!-- エラー表示 -->
+          <div v-if="error" class="flex justify-center my-4 fade-in">
+            <div
+              class="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl border border-red-100 shadow-sm flex items-center gap-2">
+              <span>{{ error.message }}</span>
+            </div>
+          </div>
+        </template>
+
+      </main>
+
+      <!-- フッターエリア -->
+      <footer v-if="hasStarted && !isCompleted" class="p-4 bg-white z-10 shrink-0 border-t border-gray-100">
+        <!-- 入力フォーム -->
+        <div v-if="!isSufficient" class="fade-in w-full">
+          <div class="flex items-end space-x-2 relative">
+            <textarea v-model="inputAnswer" @keydown.enter.prevent.exact="handleSend" :disabled="isSending || isLoading"
+              rows="1" ref="textareaRef" @input="resizeTextarea"
+              class="flex-1 p-4 pr-2 max-h-32 min-h-[56px] bg-white border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all resize-none disabled:bg-gray-50 disabled:text-gray-400 text-gray-700 placeholder-gray-400 text-base shadow-sm"
+              placeholder="回答を入力..."></textarea>
+            <div class="flex space-x-2 pb-0.5">
+              <button @click="askOracle" :disabled="isSending || isLoading || !currentQuestionId"
+                class="w-12 h-12 flex items-center justify-center bg-amber-400 text-white rounded-xl hover:bg-amber-500 active:scale-95 transition-all shadow-md disabled:opacity-50"
+                title="神託">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path
+                    d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+                </svg>
+              </button>
+              <button @click="handleSend" :disabled="isSending || !inputAnswer.trim() || !currentQuestionId"
+                class="w-12 h-12 flex items-center justify-center bg-blue-500 text-white rounded-xl hover:bg-blue-600 active:scale-95 transition-all shadow-md disabled:opacity-50"
+                title="送信">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-
-      <!-- エラー表示 (チャット形式) -->
-      <div v-if="error" class="text-red-600 p-4 bg-red-50 border border-red-300 rounded-xl">
-        エラー: {{ error.message }}
-        <button @click="fetchInitialQuestion" class="ml-4 text-sm underline">問題を再取得</button>
-      </div>
+        <!-- 次へボタン -->
+        <div v-else class="fade-in w-full">
+          <button @click="handleNextTopic"
+            class="w-full bg-sky-500 text-white font-bold py-4 px-6 rounded-2xl hover:bg-sky-600 active:scale-[0.99] focus:outline-none transition-all shadow-md flex items-center justify-center space-x-3 text-lg">
+            <span>次のトピックへ進む</span>
+          </button>
+        </div>
+      </footer>
     </div>
-
-    <!-- 2. 入力フォームエリア (Fixed Bottom) -->
-    <div class="p-4 border-t border-gray-200 bg-white sticky bottom-0">
-
-      <!-- ★修正: 通常の入力エリア (isSufficientがfalseの間だけ表示) ★ -->
-      <textarea v-if="!isSufficient" v-model="inputAnswer" @keydown.enter.prevent.exact="handleSend"
-        :disabled="isSending || !currentQuestionId"
-        class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 resize-none h-16"
-        placeholder="あなたの考えを詳しく入力 (Enterで送信, Shift+Enterで改行)"></textarea>
-
-      <!-- ★修正: 送信ボタン (isSufficientがfalseの間だけ表示) ★ -->
-      <button v-if="!isSufficient" @click="handleSend" :disabled="isSending || !inputAnswer.trim() || !currentQuestionId" :class="{
-        'opacity-50 cursor-not-allowed bg-gray-400': isSending || !inputAnswer.trim() || !currentQuestionId,
-        'hover:bg-indigo-700': !isSending && inputAnswer.trim() && currentQuestionId
-      }"
-        class="mt-2 w-full py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg transition duration-200 flex items-center justify-center">
-        <svg v-if="isSending" class="animate-spin h-5 w-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none"
-          viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-          </path>
-        </svg>
-        {{ isSending ? 'AIが思考中...' : '回答を送信' }}
-      </button>
-
-      <!-- ★追加: 次の問題へ進むボタン (isSufficientがtrueの時だけ表示) ★ -->
-      <button v-else @click="fetchInitialQuestion"
-        class="mt-2 w-full py-3 bg-green-500 text-white font-semibold rounded-lg shadow-lg transition duration-200 hover:bg-green-600 flex items-center justify-center space-x-2">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-        <span>理解完了！次の問題へ進む</span>
-      </button>
-
-    </div>
-
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, nextTick } from 'vue';
 import axios from 'axios';
 
-// DOM要素への参照
 const chatWindow = ref(null);
-
-// 状態管理変数
-const history = ref([]); // 会話履歴全体 (メッセージ配列)
-const isLoading = ref(true);
+const textareaRef = ref(null);
+const hasStarted = ref(false);
+const isSufficient = ref(false);
+const isCompleted = ref(false);
+const history = ref([]);
+const isLoading = ref(false);
 const error = ref(null);
-const inputAnswer = ref('');    // ユーザーの入力テキスト
-const isSending = ref(false);   // 送信中フラグ
-const isSufficient = ref(false); // ★追加: 問答が終了したかどうかのフラグ
-
-// 現在の問題ID (会話のどの部分に属するかを識別するために必要)
+const inputAnswer = ref('');
+const isSending = ref(false);
 const currentQuestionId = ref(null);
+const currentTopicId = ref(1);
+const nextTopicId = ref(null);
 
-// トピックID (現在は固定)
-const currentTopicId = 1;
-
-/**
- * InteractionデータをフロントエンドのMessageフォーマットに変換するヘルパー関数
- */
-const formatInteractions = (interactions) => {
-  const formattedHistory = [];
-
-  interactions.forEach(interaction => {
-    // ユーザーの回答をプッシュ
-    formattedHistory.push({
-      sender: 'user',
-      type: 'answer',
-      text: interaction.user_answer,
-      question_id: interaction.question_id,
-    });
-
-    // AIの応答をプッシュ
-    formattedHistory.push({
-      sender: 'ai',
-      type: 'feedback',
-      text: interaction.ai_response,
-      question_id: interaction.question_id,
-      is_correct: interaction.is_correct,
-    });
-  });
-  return formattedHistory;
+const startSession = async () => {
+  hasStarted.value = true;
+  history.value = [];
+  await fetchNextQuestion();
 };
 
+const resetSession = () => {
+  hasStarted.value = false;
+  isCompleted.value = false;
+  currentTopicId.value = 1;
+  history.value = [];
+};
 
-/**
- * チャットウィンドウを最下部までスクロールする
- */
+const handleNextTopic = async () => {
+  isSufficient.value = false;
+  history.value.push({ sender: 'user', type: 'answer', text: '（次のトピックへ進む）' });
+  if (nextTopicId.value) { currentTopicId.value = nextTopicId.value; } else { currentTopicId.value++; }
+  await fetchNextQuestion();
+};
+
 const scrollToBottom = () => {
   nextTick(() => {
-    const el = chatWindow.value;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
+    if (chatWindow.value) {
+      chatWindow.value.scrollTo({ top: chatWindow.value.scrollHeight, behavior: 'smooth' });
     }
   });
 };
 
-/**
- * 過去の会話履歴をデータベースから取得する関数
- */
-const fetchHistory = async (questionId) => {
-  // ★修正: currentQuestionIdではなく、引数で渡されたIDを使う
-  const tempQuestionId = questionId || 1;
-
-  try {
-    const API_URL = `http://localhost/api/questions/${tempQuestionId}/history`;
-    const response = await axios.get(API_URL);
-    return formatInteractions(response.data.history);
-  } catch (err) {
-    console.error("履歴取得エラー:", err);
-    return [];
+const resizeTextarea = () => {
+  const el = textareaRef.value;
+  if (el) {
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
   }
 };
 
-
-/**
- * 最初の質問、または次の質問を取得し、会話履歴をリセットする
- */
-const fetchInitialQuestion = async () => {
+const fetchNextQuestion = async () => {
   isLoading.value = true;
   error.value = null;
-  isSending.value = false;
-
-  // ★修正: 新しい問題に移るので、履歴と終了フラグをリセット
-  history.value = [];
-  isSufficient.value = false;
-
-  // 1. 次の質問を取得 (GET /api/topics/{topicId}/next-question)
+  scrollToBottom();
   try {
-    const API_URL = `http://localhost/api/topics/${currentTopicId}/next-question`;
+    const API_URL = `http://localhost/api/topics/${currentTopicId.value}/next-question`;
     const response = await axios.get(API_URL);
     const data = response.data;
-
-    currentQuestionId.value = data.id; // 現在の問題IDを更新
-
-    // 2. 質問メッセージを作成して履歴に追加
-    const questionMessage = {
-      sender: 'ai',
-      type: 'question',
-      text: data.question_text,
-      question_id: data.id,
-      choices: data.choices // ヒントとして表示するために選択肢も保持
-    };
-    history.value.push(questionMessage);
-
-    // 3. 過去の対話履歴をDBから取得し、会話に追記 (重要)
-    // ★修正: 取得した新しい問題IDを使って履歴を取得する
-    const pastInteractions = await fetchHistory(data.id);
-    history.value.push(...pastInteractions);
-
-
+    currentQuestionId.value = data.id;
+    nextTopicId.value = data.next_topic_id || null;
+    history.value.push({ sender: 'ai', type: 'question', text: data.question_text, question_id: data.id, choices: data.choices });
   } catch (err) {
-    console.error("問題取得エラー:", err);
-    error.value = { message: err.response?.data?.message || '問題データの取得に失敗しました。' };
+    if (err.response && err.response.status === 404) {
+      isCompleted.value = true;
+    } else {
+      console.error("Error:", err);
+      error.value = { message: '問題の取得に失敗しました。' };
+    }
+  } finally {
+    isLoading.value = false;
+    scrollToBottom();
   }
-
-  isLoading.value = false;
-  scrollToBottom();
 };
 
-
-/**
- * ユーザーが回答を送信した際の処理 (初回回答、または継続的な対話の回答)
- */
 const handleSend = async () => {
-  if (isSending.value || !inputAnswer.value.trim() || !currentQuestionId.value) return;
-
-  const answer = inputAnswer.value;
-  inputAnswer.value = ''; // 入力エリアをクリア
+  const text = inputAnswer.value.trim();
+  if (isSending.value || !text || !currentQuestionId.value) return;
+  inputAnswer.value = '';
+  if (textareaRef.value) textareaRef.value.style.height = 'auto';
   isSending.value = true;
-
-  // 1. ユーザーの回答を履歴に追加
-  history.value.push({
-    sender: 'user',
-    type: 'answer',
-    text: answer,
-    question_id: currentQuestionId.value
-  });
+  error.value = null;
+  history.value.push({ sender: 'user', type: 'answer', text: text, question_id: currentQuestionId.value });
   scrollToBottom();
-
   try {
-    // 2. バックエンドAPIを呼び出し (POST /api/questions/{questionId}/check)
     const API_URL = `http://localhost/api/questions/${currentQuestionId.value}/check`;
-
-    const response = await axios.post(API_URL, {
-      answer_text: answer
-    });
-
+    const response = await axios.post(API_URL, { answer_text: text });
     const data = response.data;
-
-    // 3. AIの応答を履歴に追加
-    history.value.push({
-      sender: 'ai',
-      type: 'feedback',
-      text: data.explanation,
-      question_id: currentQuestionId.value,
-      is_correct: data.is_correct, // 正誤判定結果も表示に利用
-    });
-
-    // ★追加: バックエンドからの終了合図をチェックし、フラグを立てる
-    if (data.is_sufficient === true) {
+    history.value.push({ sender: 'ai', type: 'feedback', text: data.explanation, question_id: currentQuestionId.value, is_correct: data.is_correct });
+    if (data.is_sufficient === true || (data.explanation && data.explanation.includes('[CORRECT]'))) {
       isSufficient.value = true;
     }
-
   } catch (err) {
-    console.error("回答送信エラー:", err);
-    error.value = { message: err.response?.data?.message || 'AI通信中にエラーが発生しました。' };
+    console.error("Send Error:", err);
+    error.value = { message: '通信エラーが発生しました。' };
   } finally {
     isSending.value = false;
     scrollToBottom();
   }
 };
 
-onMounted(fetchInitialQuestion);
+const askOracle = () => {
+  inputAnswer.value = "知恵を借してくれないか？";
+  handleSend();
+};
 </script>
 
 <style scoped>
-/* スクロールバーのスタイルはブラウザによって異なるため、簡易的に定義 */
+/* スクロールバーのデザイン */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
 
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #ccc;
-  border-radius: 3px;
+  background-color: #cbd5e1;
+  border-radius: 20px;
+}
+
+/* フェードインアニメーション */
+.fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 3点リーダー（思考中）アニメーション */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.typing-indicator span {
+  height: 6px;
+  width: 6px;
+  background-color: #94a3b8;
+  border-radius: 50%;
+  display: inline-block;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.typing-indicator span:nth-of-type(1) {
+  animation-delay: -0.32s;
+}
+
+.typing-indicator span:nth-of-type(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes bounce {
+
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+  }
+
+  40% {
+    transform: scale(1.0);
+  }
 }
 </style>
-
