@@ -1,22 +1,17 @@
 <template>
   <div class="flex items-center justify-center min-h-screen bg-gray-100 text-gray-800 font-sans">
 
-    <!-- メインのチャットウィンドウ -->
     <div
       class="w-full max-w-2xl h-[90vh] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden relative border border-gray-200">
 
-      <!-- ヘッダー -->
       <header class="py-4 px-6 border-b border-gray-100 bg-white z-10 shrink-0 text-center">
         <h1 class="text-xl font-bold text-gray-800 tracking-tight">AIソクラテス</h1>
         <p class="text-xs text-gray-500 mt-1 font-medium">汝自身を知れ</p>
       </header>
 
-      <!-- チャットメッセージ表示エリア -->
       <main ref="chatWindow" class="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar relative bg-white">
 
-        <!-- 1. スタート画面 (未開始時) -->
         <div v-if="!hasStarted" class="flex flex-col items-center justify-center h-full space-y-10 fade-in pb-20">
-          <!-- 挨拶バブル -->
           <div
             class="bg-slate-50 text-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 max-w-[85%] text-base leading-relaxed relative">
             <div class="absolute -top-2 left-5 w-4 h-4 bg-slate-50 border-t border-l border-slate-100 rotate-45"></div>
@@ -26,14 +21,12 @@
             <p>良き探求者よ、こんにちは。<br>我と共に知への道を歩み始めようではないか。<br>準備はよろしいかな？</p>
           </div>
 
-          <!-- 始めようボタン -->
           <button @click="startSession"
             class="bg-blue-500 text-white text-lg font-bold py-3 px-12 rounded-full shadow-lg hover:bg-blue-600 hover:shadow-xl hover:-translate-y-0.5 transition duration-200 ease-in-out">
             始めよう
           </button>
         </div>
 
-        <!-- 2. 全問クリア画面 -->
         <div v-else-if="isCompleted"
           class="flex flex-col items-center justify-center h-full space-y-6 fade-in text-center p-8">
           <div class="text-6xl mb-4 animate-bounce">🎉</div>
@@ -43,29 +36,29 @@
             class="mt-6 text-blue-500 hover:text-blue-700 font-semibold underline decoration-2 underline-offset-4">最初からやり直す</button>
         </div>
 
-        <!-- 3. チャット履歴 -->
         <template v-else>
           <div v-for="(message, index) in history" :key="index" class="flex w-full fade-in group"
             :class="message.sender === 'user' ? 'justify-end' : 'justify-start'">
 
-            <!-- バブル本体 -->
             <div :class="[
               'p-4 max-w-[85%] text-[15px] leading-relaxed shadow-sm relative rounded-2xl',
               message.sender === 'user'
                 ? 'bg-blue-500 text-white rounded-tr-sm'
                 : 'bg-slate-100 text-slate-800 rounded-tl-sm'
             ]">
-              <!-- ラベル -->
               <div v-if="message.sender === 'ai'"
                 class="mb-1.5 text-xs font-bold text-slate-500/80 flex items-center gap-1 select-none">
                 <span v-if="message.type === 'question'">💡 問い</span>
                 <span v-else>ソクラテス</span>
               </div>
 
-              <!-- テキスト -->
-              <div class="whitespace-pre-wrap break-words" v-html="message.text"></div>
+              <div class="break-words" :class="[
+                message.sender === 'ai'
+                  ? 'prose prose-slate prose-sm max-w-none prose-strong:text-blue-700 prose-p:leading-relaxed'
+                  : 'whitespace-pre-wrap'
+              ]" v-html="parseMarkdown(message.text)">
+              </div>
 
-              <!-- 選択肢 -->
               <div v-if="message.choices && message.choices.length > 0 && message.type === 'question'"
                 class="mt-4 pt-3 border-t border-slate-200/60">
                 <p class="text-xs font-semibold text-slate-500 mb-2">選択肢:</p>
@@ -79,7 +72,6 @@
             </div>
           </div>
 
-          <!-- AI思考中 -->
           <div v-if="isSending || isLoading" class="flex justify-start fade-in">
             <div
               class="p-4 rounded-2xl rounded-tl-sm bg-slate-100 text-slate-800 shadow-sm flex items-center min-h-[40px]">
@@ -87,7 +79,6 @@
             </div>
           </div>
 
-          <!-- エラー表示 -->
           <div v-if="error" class="flex justify-center my-4 fade-in">
             <div
               class="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl border border-red-100 shadow-sm flex items-center gap-2">
@@ -98,9 +89,7 @@
 
       </main>
 
-      <!-- フッターエリア -->
       <footer v-if="hasStarted && !isCompleted" class="p-4 bg-white z-10 shrink-0 border-t border-gray-100">
-        <!-- 入力フォーム -->
         <div v-if="!isSufficient" class="fade-in w-full">
           <div class="flex items-end space-x-2 relative">
             <textarea v-model="inputAnswer" @keydown.enter.prevent.exact="handleSend" :disabled="isSending || isLoading"
@@ -114,7 +103,7 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
                   stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <path
-                    d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+                    d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L12 3Z" />
                 </svg>
               </button>
               <button @click="handleSend" :disabled="isSending || !inputAnswer.trim() || !currentQuestionId"
@@ -129,7 +118,6 @@
             </div>
           </div>
         </div>
-        <!-- 次へボタン -->
         <div v-else class="fade-in w-full">
           <button @click="handleNextTopic"
             class="w-full bg-sky-500 text-white font-bold py-4 px-6 rounded-2xl hover:bg-sky-600 active:scale-[0.99] focus:outline-none transition-all shadow-md flex items-center justify-center space-x-3 text-lg">
@@ -144,6 +132,7 @@
 <script setup>
 import { ref, nextTick } from 'vue';
 import axios from 'axios';
+import { marked } from 'marked'; // ★追加: Markdownライブラリのインポート
 
 const chatWindow = ref(null);
 const textareaRef = ref(null);
@@ -158,6 +147,33 @@ const isSending = ref(false);
 const currentQuestionId = ref(null);
 const currentTopicId = ref(1);
 const nextTopicId = ref(null);
+
+const parseMarkdown = (text) => {
+  // 1. 安全対策
+  if (text == null || typeof text !== 'string') {
+    return '';
+  }
+
+  try {
+    let cleanText = text;
+
+    // 2. エスケープ文字（\）を完全削除
+    cleanText = cleanText.replace(/\\(\*)/g, '$1');
+
+    // 3. 【ここが新兵器】Markdown変換の前に、強制的にHTMLタグ化する
+    // ** で囲まれた文字を見つけて、直接 <strong ...>タグ に置換します。
+    // Regex解説: \*\*\s*(.*?)\s*\*\* -> **の間の文字(最短マッチ)を取得し、前後の空白は無視
+    cleanText = cleanText.replace(/\*\*\s*(.*?)\s*\*\*/g, '<strong class="text-blue-700 font-bold">$1</strong>');
+
+    // 4. 残りのMarkdown（改行やリストなど）を変換
+    // markedは、元々入っているHTMLタグはそのまま通す性質があります
+    return marked.parse(cleanText);
+
+  } catch (e) {
+    console.error("Markdown変換エラー:", e);
+    return text;
+  }
+};
 
 const startSession = async () => {
   hasStarted.value = true;
