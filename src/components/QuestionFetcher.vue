@@ -27,6 +27,7 @@
           </button>
         </div>
 
+
         <div v-else-if="isCompleted"
           class="flex flex-col items-center justify-center h-full space-y-6 fade-in text-center p-8">
           <div class="text-6xl mb-4 animate-bounce">🎉</div>
