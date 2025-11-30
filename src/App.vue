@@ -14,6 +14,7 @@ import QuestionFetcher from './components/QuestionFetcher.vue';
       </div>
     </header>
 
+
     <main class="py-10">
       <!-- 作成した問題取得コンポーネントを配置 -->
       <QuestionFetcher />
