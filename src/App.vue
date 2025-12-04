@@ -17,7 +17,7 @@ import QuestionFetcher from './components/QuestionFetcher.vue';
         </h1>
         <p class="text-lg md:text-xl text-cyan-100 text-center font-serif drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]">
           対話を通じてあなたの知識を深めます
-        </p>
+        </p>\
       </div>
     </header>
 
