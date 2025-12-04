@@ -5,23 +5,30 @@ import QuestionFetcher from './components/QuestionFetcher.vue';
 
 <template>
   <div id="app" class="min-h-screen bg-gray-100 font-sans antialiased">
-    <header class="bg-indigo-600 shadow-lg">
-      <div class="max-w-7xl mx-auto py-5 px-4 sm:px-6 lg:px-8">
-        <h1 class="text-4xl font-extrabold tracking-tight text-white text-center">
-          <span class="mr-2">💡</span> AIソクラテス
+    <header class="relative bg-black shadow-lg overflow-hidden">
+      <div class="absolute inset-0 bg-cover bg-center z-0" :style="{ backgroundImage: `url('/bg-3.jpg')` }"></div>
+
+      <div class="absolute inset-0 bg-black/40 z-10"></div>
+
+      <div class="relative z-20 max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8 w-full">
+        <h1
+          class="text-4xl md:text-5xl font-extrabold tracking-tight text-cyan-100 text-center font-serif drop-shadow-[0_0_8px_rgba(34,211,238,0.5)] mb-6">
+          Agora Digitalis
         </h1>
-        <p class="text-center text-indigo-200 mt-1">対話を通じてあなたの知識を深めます</p>
+        <p class="text-lg md:text-xl text-cyan-100 text-center font-serif drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]">
+          対話を通じてあなたの知識を深めます
+        </p>
       </div>
     </header>
 
 
-    <main class="py-10">
+    <main class="">
       <!-- 作成した問題取得コンポーネントを配置 -->
       <QuestionFetcher />
     </main>
 
-    <footer class="text-center text-sm text-gray-500 py-4 mt-10 border-t">
-      © 2024 AIソクラテス開発プロジェクト
+    <footer class="text-center text-sm text-gray-500 py-4  border-t">
+      © 2025 AIソクラテス
     </footer>
   </div>
 </template>
